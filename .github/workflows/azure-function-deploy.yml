@@ -33,4 +33,4 @@ jobs:
 
       - name: Deploy to Azure Function App
         run: |
-          func azure functionapp publish the-globe-function
+          func azure functionapp publish the-globe-function --python
