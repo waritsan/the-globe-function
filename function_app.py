@@ -1,4 +1,5 @@
 
+import os
 import azure.functions as func
 import logging
 import json
@@ -6,8 +7,8 @@ import hmac
 import hashlib
 import base64
 import requests
-LINE_CHANNEL_ACCESS_TOKEN = "nw055XPBSkjEVcAzIM5FX3Qj4IZCRkhmruhCWwks7aU1HNoq/dRlNN/5esHx3uJi6Pe+nRfm7Db1/l8y90aAOpf3yCbAYFNPaV8mYgj+5tzRryHR9459hLjD7bCw7cODgTm2JUKjaCnsNaJ1CMdAFwdB04t89/1O/w1cDnyilFU="
-LINE_CHANNEL_SECRET = "69db4b6fbe5c360d8c872bc067b47b0f"
+LINE_CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
+LINE_CHANNEL_SECRET = os.environ.get("LINE_CHANNEL_SECRET")
 
 from azure.ai.projects import AIProjectClient
 from azure.identity import DefaultAzureCredential
@@ -22,6 +23,8 @@ def line_webhook(req: func.HttpRequest) -> func.HttpResponse:
     # Verify signature
     signature = req.headers.get("X-Line-Signature")
     body = req.get_body()
+    if not LINE_CHANNEL_SECRET:
+        return func.HttpResponse("LINE_CHANNEL_SECRET is not set in environment.", status_code=500)
     hash = hmac.new(LINE_CHANNEL_SECRET.encode("utf-8"), body, hashlib.sha256).digest()
     expected_signature = base64.b64encode(hash).decode()
     if signature != expected_signature:
