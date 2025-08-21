@@ -15,6 +15,10 @@ from azure.identity import DefaultAzureCredential
 from azure.ai.agents.models import ListSortOrder
 
 
+
+# In-memory user-to-thread mapping (for demo; use persistent storage for production)
+user_thread_map = {}
+
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
 # New route to handle LINE webhook
@@ -37,15 +41,22 @@ def line_webhook(req: func.HttpRequest) -> func.HttpResponse:
             if event["type"] == "message" and event["message"]["type"] == "text":
                 user_message = event["message"]["text"]
                 reply_token = event["replyToken"]
+                user_id = event["source"].get("userId")
 
-                # Call Azure Foundry
+                # Chat history: get or create thread for user
                 foundry_response = None
                 try:
                     project = AIProjectClient(
                         credential=DefaultAzureCredential(),
                         endpoint="https://the-globe-dev-resource.services.ai.azure.com/api/projects/the-globe-dev")
                     agent = project.agents.get_agent("asst_ADU10cnt6Gom8dd6ULoFwKqI")
-                    thread = project.agents.threads.create()
+                    thread_id = user_thread_map.get(user_id)
+                    if thread_id:
+                        thread = project.agents.threads.get(thread_id)
+                    else:
+                        thread = project.agents.threads.create()
+                        user_thread_map[user_id] = thread.id
+
                     project.agents.messages.create(
                         thread_id=thread.id,
                         role="user",
@@ -58,11 +69,10 @@ def line_webhook(req: func.HttpRequest) -> func.HttpResponse:
                         foundry_response = "Sorry, something went wrong."
                     else:
                         messages = project.agents.messages.list(thread_id=thread.id, order=ListSortOrder.ASCENDING)
-                        # Only reply with the agent's response
-                        for message in messages:
-                            if message.role == "assistant" and message.text_messages:
-                                foundry_response = message.text_messages[-1].text.value
-                                break
+                        # Find the latest assistant message
+                        assistant_messages = [m for m in messages if m.role == "assistant" and m.text_messages]
+                        if assistant_messages:
+                            foundry_response = assistant_messages[-1].text_messages[-1].text.value
                 except Exception as e:
                     foundry_response = "Error: " + str(e)
 
