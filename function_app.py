@@ -55,8 +55,9 @@ def line_webhook(req: func.HttpRequest) -> func.HttpResponse:
                         foundry_response = "Sorry, something went wrong."
                     else:
                         messages = project.agents.messages.list(thread_id=thread.id, order=ListSortOrder.ASCENDING)
+                        # Only reply with the agent's response
                         for message in messages:
-                            if message.text_messages:
+                            if message.role == "assistant" and message.text_messages:
                                 foundry_response = message.text_messages[-1].text.value
                                 break
                 except Exception as e:
